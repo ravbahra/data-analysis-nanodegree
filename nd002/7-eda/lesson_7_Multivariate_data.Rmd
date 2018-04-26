@@ -1,0 +1,451 @@
+---
+title: "Lesson 7 "
+output: html_notebook
+---
+
+```{r}
+# clear variables from previous sessions
+rm(list=ls())
+```
+
+
+## Third qualitative variable
+
+### read in the data 
+```{r}
+pf = read.csv('D:/fb_data/pseudo_facebook.tsv', sep = '\t')
+```
+
+###
+
+```{r}
+ggplot(aes(x=gender, y=age), data=subset(pf, !is.na(gender))) +
+  geom_boxplot() +
+  # let's add the mean to the box plot too
+  stat_summary(fun.y = mean, geom='point', shape=4, size=5, color='red')
+```
+
+
+
+```{r}
+ggplot(aes(x=age, y=friend_count), data=subset(pf, !is.na(gender))) + 
+    geom_line(aes(color=gender), stat= 'summary', fun.y=median)
+```
+
+
+# Write code to create a new data frame,
+# called 'pf.fc_by_age_gender', that contains
+# information on each age AND gender group.
+
+# The data frame should contain the following variables:
+
+#    mean_friend_count,
+#    median_friend_count,
+#    n (the number of users in each age and gender grouping)
+
+# Here is an example of the structure of your data frame. Your
+# data values will be different. Note that if you are grouping by
+# more than one variable, you will probably need to call the
+# ungroup() function. 
+
+#   age gender mean_friend_count median_friend_count    n
+# 1  13 female          247.2953                 150  207
+# 2  13   male          184.2342                  61  265
+# 3  14 female          329.1938                 245  834
+# 4  14   male          157.1204                  88 1201
+
+# See the Instructor Note for two hints.
+```{r}
+
+# I think we're grouping by age and further grouping by
+library(dplyr)
+grouped_data <- group_by(subset(pf, !is.na(gender)), age, gender)
+pf.fc_by_age_gender <- summarise(grouped_data, mean_friend_count=mean(friend_count), median_friend_count = median(friend_count), n=n())
+pf.fc_by_age_gender
+
+```
+
+## using the chain command
+
+```{r}
+pf.fc_by_age_gender2 <- pf %>%
+  filter(!is.na(gender)) %>%
+  group_by(age,gender) %>%
+  # summarise removes one layer of grouping when it runs
+  # it removes the last group. so it will remove the gender layer
+  summarise(mean_friend_count=mean(friend_count), median_friend_count = median(friend_count), n=n()) %>%
+  ungroup() %>%
+  arrange(age)
+pf.fc_by_age_gender2
+
+```
+
+
+# Create a line graph showing the
+# median friend count over the ages
+# for each gender. Be sure to use
+# the data frame you just created,
+# pf.fc_by_age_gender.
+
+
+```{r}
+ggplot(aes(x=age, y=median_friend_count), data = pf.fc_by_age_gender2) + 
+  geom_line(aes(color=gender))
+```
+
+# going to convert from long to wide format, can use reshape2 package or tidr, example of long and wide
+# long
+
+# age   |   gender  |   median_friend_count |
+# ======|===========|=======================|
+# 13    |   male    |         254           |
+# 13    |   female  |         180           |
+# 14    |   male    |         63            |
+
+# wide
+
+# age   | male (median) | female (median) |
+# ======|===============|=================|
+
+```{r}
+install.packages("tidyr")
+```
+
+```{r}
+library(tidyr)
+
+# spread function
+# spread(data, key, value)
+
+pf.fc_by_age_gender.wide1 <- spread(
+  subset(pf.fc_by_age_gender2, select = c("gender", "age", "median_friend_count")),
+  gender,median_friend_count)
+pf.fc_by_age_gender.wide1
+
+
+```
+
+# using reshape2 to reshape the data
+
+```{r}
+install.packages('reshape2')
+library(reshape2)
+```
+
+```{r}
+# dcast - result to be a dataframe
+# acast - result to be an array
+
+# dcast(dataset, formula)
+# formula = what you want to keep on the left, + sign to separate ~ gender, then the actual value of the thing you split, using value.var
+
+pf.fc_by_age_gender.wide <- dcast(pf.fc_by_age_gender2,
+                                  age ~ gender,
+                                  value.var = 'median_friend_count')
+
+pf.fc_by_age_gender.wide
+```
+
+
+## plot the ratio of females to males to see the number of friends the average fe
+
+```{r}
+pf.fc_by_age_gender.wide1$ratio = pf.fc_by_age_gender.wide1$female/pf.fc_by_age_gender.wide1$male
+pf.fc_by_age_gender.wide1
+
+ggplot(aes(x=age, y=ratio), data = pf.fc_by_age_gender.wide1) +
+  geom_line() + 
+  geom_hline(yintercept = 1, linetype = 2)
+```
+
+
+## third quantitative variable 
+
+# tenure - how long you've been on fb
+# let's group users by the year they joined
+
+```{r}
+
+pf_2 <- subset(pf, select = c("userid", "age", "tenure", "friend_count", "gender")) 
+pf_2$year_joined <- floor((2014 - (pf_2$tenure / 365)))
+pf_2
+
+summary(pf_2$year_joined)
+
+```
+
+
+# using cut to create 4 bins across the dates
+# 2004 - 2009
+# 2009 - 2011
+# 2011 - 2012
+# 2012 - 2014
+
+```{r}
+new_cut <- cut(pf_2$year_joined, 4)
+# this unfortunatley gives the following dates
+# (2005,2007] (2007,2010] (2010,2012] (2012,2014
+year_cuts <- c(2004, 2009, 2011, 2012, 2014)
+new_cut <- cut(pf_2$year_joined, breaks = year_cuts)
+levels(new_cut)
+
+pf_2$year_joined.bucket <- new_cut
+table(pf_2$year_joined.bucket, useNA = 'ifany')
+#typeof(pf_2$year_joined)
+```
+
+## plot the median friend_count across the age factors
+
+```{r}
+ggplot(aes(x=age, y=friend_count), data = subset(pf_2, !is.na(year_joined.bucket))) + 
+  geom_line(aes(color=year_joined.bucket), stat='summary', fun.y = median)
+  
+```
+## Grand Mean
+
+# (1) Add another geom_line to code below
+# to plot the grand mean of the friend count vs age.
+
+# (2) Exclude any users whose year_joined.bucket is NA.
+
+# (3) Use a different line type for the grand mean.
+
+```{r}
+ggplot(aes(x=age, y=friend_count), data = subset(pf_2, !is.na(year_joined.bucket))) + 
+  geom_line(aes(color=year_joined.bucket), stat='summary', fun.y = mean) +
+  geom_line(stat='summary', fun.y=mean,linetype=2)
+  
+  
+```
+
+# find the number of friends each user has per day since starting facebook
+
+```{r}
+
+pf = read.csv('D:/fb_data/pseudo_facebook.tsv', sep = '\t')
+pf_3 <- subset(pf,select = c("tenure", "friend_count"), tenure > 0)
+pf_3$friend_rate <- pf_3$friend_count / pf_3$tenure
+max(pf_3$friend_rate)
+
+```
+## create line graph of friendships intiated per day vs tenure
+# you need age, tenure , friendships_initated, year_joined.bucket
+
+
+```{r}
+pf_4 <- subset(pf, select = c("age", "tenure","friendships_initiated"), tensure > 0)
+pf_4$year_joined <- floor((2014 - (pf_4$tenure / 365)))
+
+pf_4$year_joined.bucket <- cut(pf_4$year_joined, breaks = year_cuts)
+pf_4$friendships_initiated_rate <- pf_4$friendships_initiated/pf_4$tenure
+
+ggplot(aes(x=tenure, y=friendships_initiated_rate), data = pf_4) + 
+  geom_line(aes(color=year_joined.bucket),stat='summary', fun.y='mean')
+```
+
+
+## using geom_smooth
+
+
+```{r}
+ggplot(aes(x=tenure, y=friendships_initiated_rate), data = pf_4) + 
+  geom_smooth(aes(color=year_joined.bucket))
+```
+
+# Yogurt data
+
+
+```{r}
+yo <- read.csv('D:/RFiles/yogurt.csv')
+
+# convert yo id to factor variable
+
+yo$id <- factor(yo$id)
+str(yo)
+```
+
+```{r}
+
+qplot(x=price, data=yo, binwidth=10)
+
+```
+
+
+```{r}
+
+unique(yo$price)
+```
+
+# now find the total counts of yogurt for each household purchase.... using the transform function
+# transform allows you to create a dataframe, it can also combine variables in the dataframe
+
+```{r}
+yo <- transform(yo, all.purchases = strawberry + blueberry + pina.colada + plain + mixed.berry)
+qplot(x=all.purchases, data=yo, binwidth=1)
+```
+
+
+```{r}
+ggplot(aes(x = time, y=price), data=yo) + geom_point()
+#ggplot(aes(x=time, ))
+```
+
+```{r}
+levels(yo$id)
+```
+
+```{r}
+set.seed(4230)
+
+#sample from the factors, let#s sample 16 ids
+sample.ids <- sample(levels(yo$id), 16)
+
+ggplot(aes(x=time, y=price), data= subset(yo, id %in% sample.ids)) + 
+  facet_wrap(~ id) +
+  geom_line() +
+  geom_point(aes(size=all.purchases), pch=1)
+
+```
+
+## scatterplot matrices
+
+# going to use the ggally library, an extension to 
+
+```{r}
+install.packages('GGally')
+library(GGally)
+```
+
+```{r}
+theme_set(theme_minimal(20))
+
+set.seed(1836)
+
+pf_subset <- pf[,c(2:15)]
+
+# nrow function returns the number of rows present
+# sample.int 
+
+ggapirs(pf_subset[sample.int()])
+```
+---
+title: "lesson_7"
+output: html_document
+---
+
+
+# scatter plot matrix great when all your variables are numerical, but sometimes you get categorical variables in there so regular scatterplot isn't good enough
+
+
+```{r}
+install.packages('GGally')
+```
+
+```{r}
+library(GGally)
+library(ggplot2)
+```
+
+```{r}
+
+pf <- read.csv('D:/RFiles/lesson3/pseudo_facebook.tsv', sep = '\t')
+pf_subset <- pf[,c(2:15)]
+
+theme_set(theme_minimal(20))
+set.seed(1836)
+# get the number of rows in the 
+n_rows <- nrow(pf_subset)
+
+# gets a sample of ints, you specify the max number of the variable and the same size, ensure sample size < max number or ensure to add replace=False
+
+# generate 1000 samples from the dataset
+random_sample <- sample.int(n_rows, 1000)
+# dataset [rows,cols] (leave empty for all rows or cols)
+
+ggpairs(pf_subset[random_sample,])
+
+```
+
+```{r}
+library(reshape2)
+```
+
+# reading in genomic data - Heatmap
+```{r}
+nci <- read.table('D:/RFiles/nci.tsv')
+# new column names are between 1 - 64
+colnames(nci) <- c(1:64)
+
+#the melt command takes in a dataset, some the column names are placed in the dataset as a variable
+#  subject time age weight height
+#1    John    1  33     90      2
+#2    Mary    1  NA     NA      2
+
+# molten = melt(x, id = c("subject", "time"))
+# molten
+#   subject time variable value
+# 1    John    1      age    33
+# 2    Mary    1      age    NA
+# 3    John    1   weight    90
+# 4    Mary    1   weight    NA
+# 5    John    1   height     2
+# 6    Mary    1   height     2
+
+nci.long.samp <- melt(as.matrix(nci[1:200,]))
+#rename
+names(nci.long.samp) <- c("gene", "case", "value")
+head(nci.long.samp)
+
+```
+
+```{r}
+ggplot(aes(y=gene, x=case, fill=value), data=nci.long.samp) + 
+  geom_tile() +
+  scale_fill_gradientn(colors=colorRampPalette(c('blue','red'))(100))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

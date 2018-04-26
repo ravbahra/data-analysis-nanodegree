@@ -1,0 +1,414 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+plot(cars)
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
+
+```{r}
+library(ggplot2)
+fb_data <- read.csv('D:/fb_data/pseudo_facebook.tsv', sep='\t')
+
+qplot(x = age, y=friend_count, data = fb_data)
+```
+
+you don't have to decare x and y explictly
+
+```{r}
+qplot(age, friend_count, data = fb_data)
+```
+
+using ggplot, specity the geom as geom_point() which is for scatter plot
+
+you need to wrap your x and r variables in an aesthetics wrapper
+```{r}
+ggplot(aes(x = age, y=friend_count), data=fb_data) + geom_point() + xlim(13,90)
+```
+
+## using alpha parameter
+
+```{r}
+ggplot(aes(x = age, y=friend_count), data=fb_data) + geom_point(alpha=1/20) + xlim(13,90)
+```
+
+
+
+##using geom_jitter()
+this adds noise so you can see a clearer shape of the relationship between age and friend count. Also we have perfectly lined up columns at the moment, which isn't a true reflection of .
+
+
+What you'll actually find it, most of the users even younger uses have less than 1000 friends. it's only very few friends that
+```{r}
+ggplot(aes(x=age, y=friend_count), data=fb_data) + geom_jitter(alpha = 1/20) + xlim(13,90)
+
+```
+
+```{r}
+ggplot(aes(x=log10(age), y=log10(friend_count)), data=fb_data) + geom_point(alpha=1/20)
+
+```
+
+## using coord_trans()
+```{r}
+ggplot(aes(x=age, y=friend_count), data=fb_data) + geom_point(alpha=1/20) + xlim(13,90) + coord_trans( y="sqrt")
+```
+
+## using position jitter
+
+- you ahve friend counts around 0, if you add noise to 0 could end up with negative number, squaring that will give imaginary, use position jitter with threshold of 0 
+
+```{r}
+ggplot(aes(x=age, y=friend_count), data=fb_data) + geom_point(alpha=1/20, position = position_jitter(h=0)) + xlim(13,90) + coord_trans( y="sqrt")
+```
+
+
+## investigation of relation between friends initiated and age
+
+```{r}
+ggplot(aes(x = age, y=friendships_initiated),data=fb_data) + geom_point(alpha=1/50, position=position_jitter(h=0)) + coord_trans(y='sqrt')
+#names(fb_data)
+
+```
+## dyplr
+```{r}
+#install.packages('dplyr')
+library(dplyr)
+
+dim(diamonds)
+
+names(diamonds)
+
+#select fom carat to color
+select(diamonds, carat:color)
+
+select(diamonds, carat)
+
+#everything except carat -> color
+select(diamonds, -(carat:color))
+
+filter(diamonds,price > 1800)
+
+filter(diamonds, price > 1800 & carat > 1)
+
+
+#order dataframe according to the a variable
+ordered <- arrange(diamonds, carat)
+
+tail(ordered)
+
+backward <- arrange(diamonds, desc(price))
+
+backward
+
+reanme(diamonds, colold = col_new)
+
+#add a new variabe
+
+new_tbl <- mutate(diamonds, price_per_carat = price/carat)
+new_tbl
+
+#group by then use aggregare in summarise
+
+gb <- group_by(diamonds, cut)
+summarise(gb, noodle = mean(price))
+
+# if there's missing data, specify, na.rm = TRUE (Remove na values) 
+#e.g 
+summarise(gb, noodle = mean(price, na.rm=TRUE))
+
+
+
+```
+
+
+```{r}
+names(fb_data)
+age_groups <- group_by(fb_data, age)
+age <- summarise(age_groups, friend_count_mean = mean(friend_count), friend_count_median = median(friend_count))
+age_sorted <- arrange(age, age)
+age_sorted
+```
+
+```{r}
+
+age_groups <- group_by(fb_data, age)
+# this is your aggregate
+age_data <- summarise(age_groups, fc_mean = mean(friend_count), fc_median = median(friend_count), n = n())
+head(age_data)
+
+age_data <- arrange()
+
+```
+
+
+
+## %>% - pipe in data to 
+
+```{r}
+new_data <- fb_data %>%
+group_by(age) %>%
+  summarise(fc_mean = mean(friend_count), fc_median = median(friend_count), n=n()) %>%
+  arrange(age)
+head(new_data)
+  
+```
+
+
+```{r}
+
+ggplot(aes(x = age, y=fc_mean), data=new_data) + geom_line()
+```
+
+## overlaying summaries
+```{r}
+
+ggplot(aes(x=age, y=friend_count), data=fb_data) +
+  xlim(13,90) + #apparently you can use the coord_cartesian(xlim = c(13,90)) to zoom in
+  # coord_cartesian(xlim=c(13,90)) + 
+  geom_point(alpha=0.05,
+             position=position_jitter(h=0),
+             color='orange') + 
+  coord_trans(y='sqrt') +
+  geom_line(stat = 'summary', fun.y = mean) + # add a symmary line, with function y = mean()
+  geom_line(stat = 'summary', fun.y = quantile, fun.args = list(probs = .1),
+            linetype = 2, color='blue') + 
+  geom_line(stat = 'summary', fun.y = quantile, fun.args = list(probs = .9),
+            linetype = 2, color='red') +
+  geom_line(stat = 'summary', fun.y = quantile, fun.args = list(probs = .5),
+            linetype = 2, color='green')
+            # probability = 10%, so you get the 10th percent quantile
+```
+
+## summary
+
+- 90% of users have friend counts betlow that line 90% quantile line
+- 
+
+
+# using coord_cartesian
+
+you need to get rid of xlim and replace with coord_cartesian, also remove coord_trans
+
+
+```{r}
+
+ggplot(aes(x=age, y=friend_count), data=fb_data) +
+  # xlim(13,90) + #apparently you can use the coord_cartesian(xlim = c(13,90)) to zoom in
+  coord_cartesian(xlim=c(13,90), ylim=c(0,1000)) + 
+  geom_point(alpha=0.05,
+             position=position_jitter(h=0),
+             color='orange') + 
+  # coord_trans(y='sqrt') +
+  geom_line(stat = 'summary', fun.y = mean) + # add a symmary line, with function y = mean()
+  geom_line(stat = 'summary', fun.y = quantile, fun.args = list(probs = .1),
+            linetype = 2, color='blue') + 
+  geom_line(stat = 'summary', fun.y = quantile, fun.args = list(probs = .9),
+            linetype = 2, color='red') +
+  geom_line(stat = 'summary', fun.y = quantile, fun.args = list(probs = .5),
+            linetype = 2, color='green')
+            # probability = 10%, so you get the 10th percent quantile
+```
+
+
+## pearsons r to find correlation coefficient between 2 variables
+
+# correlation between age and friend count?
+# using cor.test function
+
+```{r}
+fc_a <- subset(fb_data, friend_count > 0)
+
+# ?cor.test for documentation
+cor.test(fc_a$age, fc_a$friend_count, method = 'pearson')
+
+```
+
+# using the with function
+this allows us to use
+
+```{r}
+
+with(fb_data, cor.test(age, friend_count, method='pearson'))
+```
+
+# subsettings data excluding ages less than 70
+
+```{r}
+
+fc_70 <- subset(fb_data, age <= 70)
+with(fc_70, cor.test(age, friend_count))
+
+```
+
+## likes received on the desktop online (www_likes_received) vs likes received in total (www_likes)
+
+you got the mobile_likes_received too
+
+```{r}
+
+#with(fb_data, cor.test(www_likes_received, www_likes))
+ggplot(aes(x=www_likes_received, y=likes_received), data = fb_data) +
+  coord_trans(x = 'sqrt', y='sqrt') + 
+  geom_point(alpha=0.2,color='orange')
+
+```
+
+# checking good limits for your graphs
+
+use the quantile command to see where 95% of the data is concentrated 
+
+```{r}
+
+#with(fb_data, cor.test(www_likes_received, www_likes))
+ggplot(aes(x=www_likes_received, y=likes_received), data = fb_data) +
+  geom_point(alpha=0.2,color='orange') + 
+  xlim(0, quantile(fb_data$www_likes_received, 0.95)) + 
+  ylim(0,quantile(fb_data$likes_received, 0.95)) + 
+  geom_smooth(method = 'lm', color='red') #lm = linear model
+
+```
+
+
+
+# whats the correlation between the data
+
+```{r}
+with(fb_data, cor.test(likes_received, www_likes_received))
+
+```
+
+```{r}
+install.packages('alr3')
+library(alr3)
+#data(Mitchell)
+
+```
+
+
+```{r}
+
+ggplot(aes(x = Month, y = Temp), data = Mitchell) +
+  geom_line()
+
+
+with(Mitchell, cor.test(Month, Temp))
+```
+
+
+
+```{r}
+
+# here i'm going to ue modulo so month numbers are repeated back between 0-11, then i will group and
+# find the mean
+
+temp_tbl_2 <- Mitchell
+temp_tbl_2['round_month'] = temp_tbl_2$Month%%12
+temp_tbl_grp <- group_by(temp_tbl_2, round_month)
+
+month_mean <- summarise(temp_tbl_grp, mean_temp = mean(Temp))
+
+ggplot(aes(x=round_month, y=mean_temp), data= month_mean) +
+  geom_line()
+
+
+
+```
+
+## using scale_x_discrete for repeating values
+
+```{r}
+ggplot(aes(x=Month%%12, y=Temp), data = Mitchell) +
+  scale_x_discrete(limits = seq(0,11)) +
+  geom_point(alpha=0.1)
+
+```
+
+
+```{r}
+
+#dcor.test(Mitchell$Month, Mitchell$Temp)
+```
+
+## facebook data with age in months
+
+
+```{r}
+library('stringr')
+library('ggplot2')
+library('dplyr')
+```
+```{r}
+
+
+
+dob_d <- str_pad(as.character(fb_data$dob_day), 2, side = 'left', pad = "0")
+dob_m <- str_pad(as.character(fb_data$dob_month), 2, side = 'left', pad = "0")
+dob_y <- str_pad(as.character(fb_data$dob_year), 2, side = 'left', pad = "0")
+
+date_str <- paste(dob_d, dob_m, dob_y, sep = "-")
+
+dob_date <- as.Date(date_str, format = "%d-%m-%Y")
+
+age_date <- as.Date("31-12-2013", format = "%d-%m-%Y") - dob_date
+age_date %% 365
+
+#dob_date <- as.Date()
+
+```
+
+
+
+```{r}
+
+months_between_dec2013 <- function(month, year){
+  yrs <- 12 * (2013-year)
+  rmnths <- 12 - month
+  return(yrs + rmnths)
+}
+#months_between_dec2013(fb_data$dob_day, fb_data$dob_month, fb_data$dob_month)
+
+fb_new_df <- data.frame(friend_count = fb_data$friend_count, age_months = months_between_dec2013(fb_data$dob_month, fb_data$dob_year))
+fb_new_df
+
+age_grp <- group_by(fb_new_df, age_months)
+age_counts <- summarise(age_grp, friend_count = mean(friend_count))
+
+ggplot(aes(x=age_months, y=friend_count), data=age_counts) +
+  geom_line() +
+  geom_smooth()
+
+```
+
+```{r}
+head(fb_data)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+f

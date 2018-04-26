@@ -1,0 +1,563 @@
+---
+title: "Exploratory Data Analysis of the Red Wine"
+author: "Ravinder Bahra"
+date: "April 15th 2018"
+output: 
+  html_document:
+    css: eda.css
+---
+___
+
+
+```{r echo=FALSE, clean_workspace}
+# clear the workspace
+rm(list=ls())
+
+```
+
+
+```{r echo=FALSE, install_dependencies }
+# install.packages("ggplot2", dependencies = T) 
+# install.packages("knitr", dependencies = T)
+# install.packages("dplyr", dependencies = T)
+# install.packages("GGally", dependencies = T)
+# install.packages("lemon", dependencies = T)
+```
+
+```{r echo=FALSE, load_dependencies }
+suppressWarnings(suppressMessages(library(ggplot2)))
+suppressWarnings(suppressMessages(library(gridExtra)))
+suppressWarnings(suppressMessages(library(GGally)))
+# This is used for pretty printing data frame tables
+suppressWarnings(suppressMessages(library(lemon)))
+
+knit_print.data.frame <- lemon_print
+```
+
+```{r echo=FALSE, load_dataset}
+# Read 
+df <- read.csv('D:/RFiles/datasets/wineQualityReds.csv')
+wine_dataset <- df[,2:length(df)]
+```
+
+## Introduction
+
+The following report uses the public red wine dataset collected for the report
+titled *Modeling wine preferences by data mining from physicochemical properties
+*by Paulo Cortez.
+
+The dataset consists of 1599 samples, 11 input variables which are based on 
+physiochemical properties of the wine and 1 output variable which is the quality of the wine.
+The quality of the wine was based on sensory data (taste).
+
+3 wine experts assessed and rated the quality of the wine, a score between 
+0 to 10 was given where 0 is very bad and 10 is very good.
+
+This report will investigate which of these properties impacts the quality of 
+the wine.
+
+## Univariate Plots and Investigation
+
+### View of the data  {.smallfont}
+
+```{r, head_wine_dataset}
+head(wine_dataset)
+```
+
+## {}
+
+The table shows that all of the data is numerical, we have the following 
+physicochemical properties we can use to explore the dataset. Some of the explanations
+for the properites were given as part of the dataset.
+
+- Fixed Acidity - Represents the non volatile acids in the wine
+- Volatile Acidity - Too high can results in a vinegar like taste (unpleasant)
+- Citric Acid - adds flavour to the wine
+- Residual Sugar - The sugar left after the fementation process. Large amounts 
+are found in sweeter wines
+- Chlorides - salt content
+- Free Sulfur Dioxide  - used to prevent microbial growth and prevents the wine
+from oxidizing
+- Density - density of the liquid. Denisity of water is  0.997 g/m<sup>3</sup>
+- pH - The acidity of the wine, lower values on the ph scale are more acidic (higher is alkaline). According to the information given with the dataset we'll find most wines have a ph between 3-4
+- Sulphates - added to the wine to increase the sulfur dioxide gas level. Sulfur
+dioxide gas is an antimicrobial (agent that kills microorganisms )
+- Alcohol - The % of alcohol in the wine 
+
+
+#### Statistical summaries of wine properties
+```{r, summary_wine_dataset}
+summary(wine_dataset)
+```
+
+#### Distributions of wine properties
+
+The following code will loop over the column names and generate histograns of
+all the wine properties
+```{r, distribution_wine_properties}
+# this code will iterate over all columns/properties in the dataset and create
+# a distribution. The distributions wll be added to a list. This list will be
+# passed to grid.arrange to arrange a grid view of all the distribution plots
+
+# pull all the names of the columns into a vector variable
+column_names <- names(wine_dataset)
+
+# create an empty list to store the plots 
+plot_list <- list()
+
+# iterate over the column names and create a plot for each property
+for (i in 1:length(column_names)){
+  # generate a histogram and add to the list
+  plot_list[[i]] <- ggplot(aes_string(x=column_names[i]), data=wine_dataset) +
+    geom_histogram(bins=30)
+}
+# pass the list to grid.arrange to display all pl
+grid.arrange(grobs = plot_list, ncol = floor(sqrt(length(column_names))))
+```
+
+#### Counts for the variable Quality of the wines
+
+```{r, echo=FALSE, table_counts_quality}
+table(wine_dataset$quality)
+```
+
+#### Spread of the distributions
+
+```{r,standard_deviations}
+# this code section will apply the standard deviation function over
+
+# MARGIN=2 works over columns (1 is rows), apply the standard deviation
+# function over all columns
+sd_data <- apply(wine_dataset, MARGIN = 2, sd)
+
+# convert to data frame for better viewing
+sd_data_df <- data.frame(sd_data)
+
+sd_data_df
+
+```
+
+## Univariate Analysis
+
+
+
+Looking at the distribution of the wine quality, most of the wines were rated
+5/10 - 6/10. 
+
+Most of the distributions are positively skewed, density, ph and quality appear
+normally distributed. 
+
+Citric acid shows a bimodal distribution.
+
+Looking at the summary statistics for each physicochemical property, some of
+the propeties have a lot of outliers. The most notiable from the distributions
+and the summary statistics are 
+
+- residual sugar
+- chlorides
+- total sulfur dioxide
+- sulphates
+
+In the bivariate section we can begin to look at how these variables
+effect each other to determine what properties effect the quality.
+
+
+# Bivariate Analysis
+
+Now we will look at multiple variables together. Pairwuise plots are a good
+way to see what variables correlate together
+```{r}
+# The function scatter_func returns a scatter plot with the addition of a 
+# regression line. The default behavior is over ridden by passing a function
+# as a parameter in ggpairs
+
+scatter_func <- function(data, mapping,...){
+  p <- ggplot(data=data, mapping = mapping) +
+    # add alpha level to the plot
+    geom_point(alpha=0.01) +
+    # add a regression line
+    geom_smooth(method = "lm", se = FALSE) +
+    #reduce the size of the text so it doesn't overlap
+    theme(text = element_text(size=8),
+        axis.text.x = element_text(angle=90))
+}
+
+colnames <- names(wine_dataset)[1:length(names(wine_dataset))]
+
+ggpairs(wine_dataset,
+        columns = 1:ncol(wine_dataset),
+        upper = list(continuous = wrap("cor", size = 2.5)),
+        lower = list(continuous = scatter_func),
+        columnLabels = gsub('.', ' ', colnames, fixed = T),
+        labeller = label_wrap_gen(10)
+        #diag = list(continuous = diag_func)
+        )
+```
+
+#### Which variables impact quality
+
+The output variable (quality) is of most interest to us, we'd like to determine 
+which properties of the wine contribute to a greater quality
+
+There are some properties that do correlate with quality. The correlations are
+not strong but do stand out and are worth looking into for further analysis.
+
+The properties that stood out against quality the most are as follows
+
+- Alcohol content (+0.476)
+- Volatile acidity (-3.91)
+- sulphate (+0.251)
+- Citric acid (+0.226)
+
+
+Other correlations not against quality are as follows
+
+- *Total Sulfur Dioxide* and *Free Sulphur Dioxide* corrlate, which isn't unexpected
+as total sulfur dioxide contains free sulfur dioxide
+- *Citric Acid* and *Fixed Acidity* (0.672) - again this is expected with larger 
+volumes of acid
+- *pH* with *Citric Acid* (-0.542) and *pH* with *Fixed Acidity* (-0.683) - again will
+correlate, higher acidity has a lower PH (higher Ph is more alkaline)
+- *Citric Acid* and *Volatile Acidity* (-0.552)
+- *Alcohol Content* and *Density* (-0.496)
+- *Density* and *Residual Sugar* (0.355) 
+- *Density* and *pH* (-0.342)
+
+An easier view of the correlations
+```{r, correlation_data}
+cor(x=wine_dataset[,2:12], y=wine_dataset$quality)
+```
+
+
+
+#### Box plots of quality
+
+Now we can take a look at quality against some of the variables of interest
+```{r}
+# create a new variable to hold factor version of quality
+wine_dataset$quality_factors <- as.factor(wine_dataset$quality)
+
+# create box plots for each property
+
+# alcohol
+b_plot_alcohol <- ggplot(aes(x=quality_factors,y=alcohol),
+      data=wine_dataset) +
+  geom_boxplot(outlier.colour="red")
+
+# volatile acidity
+b_plot_acidity <- ggplot(aes(x=quality_factors,y=volatile.acidity),
+      data=wine_dataset) +
+  geom_boxplot(outlier.colour="red")
+
+# citric acid
+b_plot_citric_acid <- ggplot(aes(x=quality_factors,y=citric.acid),
+      data=wine_dataset) +
+  geom_boxplot(outlier.colour="red")
+
+# sulphates
+b_plot_sulphate<- ggplot(aes(x=quality_factors,y=sulphates),
+      data=wine_dataset) +
+  geom_boxplot(outlier.colour="red")
+
+# arrange plots in a grid
+grid.arrange(b_plot_alcohol,b_plot_acidity,b_plot_citric_acid, b_plot_sulphate)
+
+
+```
+
+### scatter plots
+
+#### code for plotting scatter plots and histograms
+```{r, scatter_functions}
+# the following code allows us to pass in a property and it will create a 
+# scatter plot
+quality_scatter <- function(wine_property){
+  plt <- ggplot(aes_string(x='quality',y=wine_property),data=wine_dataset) +
+  geom_point(position='jitter', aes(color=quality), alpha=0.3) +
+  geom_smooth(method = 'lm')
+  return(plt)
+}
+
+# the function creates faceted historgrams which are split by the quality of the
+# wine
+wine_property_hist <- function(wine_property){
+  plt <- ggplot(aes_string(x=wine_property), data=wine_dataset) +
+  geom_histogram() +
+  #geom_histogram(aes(fill=quality_factors)) +
+  facet_wrap(~quality_factors)
+  return(plt)
+}
+```
+
+#### scatter plot of Alcohol vs quality
+
+```{r, echo=FALSE, scatter_alcohol}
+quality_scatter('alcohol')
+```
+
+#### histogram of alcohol faceted by quality
+```{r, echo=FALSE, histogram_alc_facet_quality}
+wine_property_hist('alcohol')
+```
+
+#### scatter plot of Volatile acidity vs quality
+```{r, echo=FALSE, scatter_volatile}
+quality_scatter('volatile.acidity')
+```
+
+#### histogram of volatile acidity faceted by quality
+```{r, echo=FALSE, histogram_vol_facet_quality}
+wine_property_hist('volatile.acidity')
+```
+
+#### scatter plot of citric acid vs quality
+```{r, echo=FALSE, scatter_citric}
+quality_scatter('citric.acid')
+```
+
+#### histogram of citric acid faceted by quality
+```{r, echo=FALSE, histogram_cit_facet_quality}
+wine_property_hist('citric.acid')
+```
+
+#### scatter plot of sulphates vs quality
+```{r, echo=FALSE, scatter_sulphates}
+quality_scatter('sulphates')
+```
+
+#### histogram of sulphates faceted by quality
+```{r, echo=FALSE, histogram_sul_facet_quality}
+wine_property_hist('sulphates')
+```
+
+#### Density
+
+The density plot below shows the distribution of density with a line showing
+where the density of water is.
+
+
+```{r, density_plot}
+ggplot(aes(x=density), data=wine_dataset) +
+  geom_histogram() +
+  geom_vline(xintercept=0.997, colour="red")
+```
+
+Let's take a look where the position of the distributions are when
+using face wrap with alcohol factors.
+```{r}
+wine_dataset$alcohol_factors <- cut(wine_dataset$alcohol, breaks = seq(8.5,15,0.5))
+
+ggplot(aes(x=density), data=wine_dataset) +
+  geom_histogram() +
+  geom_vline(xintercept=0.997, colour="red") +
+  facet_wrap(~alcohol_factors)
+
+```
+
+
+```{r echo=FALSE, density_plt}
+
+# ggplot(aes(x=density), data=wine_dataset) +
+#   geom_histogram() +
+#   geom_vline(xintercept=0.997, colour="red") +
+#   facet_grid(quality_factors~alcohol_factors)
+```
+
+#### sugar vs quality, outliers removed
+
+
+```{r}
+
+# standard deviation of the residual sugar
+sd_rs <- sd(wine_dataset$residual.sugar)
+
+no_outliers <- subset(wine_dataset, residual.sugar < 3*sd_rs)
+
+ggplot(aes(x=quality, y=residual.sugar), data=no_outliers) +
+  geom_point(position='jitter') +
+  geom_smooth(method = 'lm') 
+
+cor(x=no_outliers$residual.sugar, y = no_outliers$quality)
+
+```
+
+
+##### acidity and residual sugar
+
+```{r}
+ggplot(aes(x=volatile.acidity, y=residual.sugar), data=wine_dataset) +
+  geom_point(aes(color=quality_factors))
+
+```
+
+## Bivariate Plots Analysis
+
+I was surprised to see that residual sugar didn't correlate with quality. I 
+initially had presumptions that sweeter wines would score higher on quality.
+
+Even removing the outliers did not improve the correlation.
+
+
+It was noticed that increased alcohol decreases the density of the wine.
+This is due to the fact that alcohol is less dense than water. This could indicate 
+that less dense wines are seen as better quality
+
+The intial box plots shows the distributions for different quality ratings. An
+increase in alcohol did show an increase in quality. Is this because of the 
+alcohol content or is the fact the increase in alcohol reduces the density 
+of the liquid.
+
+An increase in citric acid also showed an increase in quality
+
+It could be seen that an increase in 
+
+# Multivariate plots
+
+#### does the total acidity in red wine impact quality?
+
+we can add up the 3 acidic properties and look at acid in general and the effect
+on the quality of wine
+
+```{r, total_acidity}
+wine_dataset$total_acid = wine_dataset$fixed.acidity + 
+  wine_dataset$volatile.acidity +
+  wine_dataset$citric.acid
+
+ggplot(aes(x=quality_factors,total_acid), data = wine_dataset) +
+  geom_boxplot()
+
+#ggplot(aes)
+
+```
+The plot doesn't show anything too promising, best to look at these as individual
+components on a bar chart
+
+
+
+
+```{r}
+library(dplyr)
+
+library(reshape2)
+
+
+mean_acids <- wine_dataset %>% 
+  group_by(quality) %>% 
+   summarise(mean_citric = mean(citric.acid),
+             mean_fixed_acidity = mean(fixed.acidity),
+             mean_volatile_acidity = mean(volatile.acidity))
+mean_acids
+
+# convert to long format data so we can
+mdata <- melt(mean_acids, id.vars = c("quality"))
+
+mdata
+
+ggplot(aes(x=quality, y=value), data=mdata) +
+  geom_line(aes(color = variable))
+
+```
+
+
+```{r}
+
+acid_data <- subset(wine_dataset, select = c("fixed.acidity", "volatile.acidity", "citric.acid", "pH", "quality"))
+
+
+# convert to long format for
+
+acidic_reshape <- melt(acid_data, id.vars = c("quality"))
+
+ggplot(aes(x=quality, y=value), data=acidic_reshape) +
+  geom_point(aes(color = variable), alpha=0.2)
+
+
+names(wine_dataset)
+
+```
+
+the sulfur dioxide againsts total_acid content
+
+
+```{r}
+
+sulfur_data <- subset(wine_dataset, select = c("free.sulfur.dioxide","total.sulfur.dioxide",
+                                               "total_acid"))
+
+sulfur_reshape <- melt(sulfur_data, id.vars = c("total_acid"))
+
+ggplot(aes(x=total_acid, y=value), data=sulfur_reshape) +
+  geom_point(aes(color=variable))
+
+```
+
+```{r}
+
+
+sulfur_grouped <- sulfur_data %>%
+  group_by("total_acid") %>%
+   summarise(mean_fsd = mean(free.sulfur.dioxide), mean_tsd = mean(total.sulfur.dioxide))
+  
+```
+
+```{r}
+ggplot(aes(x=citric.acid, y=sulphates), data=wine_dataset) +
+  geom_point(aes(color=quality_factors)) +
+  geom_smooth(method = 'lm')
+```
+
+# investigation of the pH levels
+```{r}
+
+
+```
+
+
+```{r}
+
+
+
+
+summary(wine_dataset$pH)
+
+
+# based on the summary
+# ggplot(aes(y=pH), data=wine_dataset) + geom_boxplot()
+
+wine_factors = seq(2.5,4.25,by = .25)
+
+wine_dataset$ph_factor <- cut(wine_dataset$pH, breaks = wine_factors)
+
+
+ggplot(aes(x=density, y=residual.sugar), data=wine_dataset) +
+  geom_point(aes(color=ph_factor)) +
+  geom_smooth(method = 'lm') +
+  facet_wrap(~quality_factors)
+```
+
+
+```{r}
+ggplot(aes(x=citric.acid, y=alcohol), data=wine_dataset) +
+  geom_point(aes(color=quality_factors)) +
+  geom_smooth(method = 'lm')
+
+```
+
+```{r}
+ggplot(aes(x=ph_factor, y=quality_factors), data=wine_dataset) + geom_point()
+names(wine_dataset)
+```
+
+a better correlation is seen with better qualuty wines, howver probably due to
+fewer numbers in the
+
+
+
+
+# according to
+- well made wines (red wines from warmer climates, high in tannins and alcohol, will be low in acidity)
+
+# references 
+
+[1] - https://en.wikipedia.org/wiki/Antimicrobial
+

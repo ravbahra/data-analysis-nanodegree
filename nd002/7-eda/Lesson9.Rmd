@@ -1,0 +1,228 @@
+---
+title: 'Lesson 9 : Diamonds & Price Predictions'
+output: html_document
+---
+
+
+```{r}
+rm(list = ls())
+```
+
+```{r}
+install.packages('GGally')
+install.packages('scales')
+install.packages('memisc')
+install.packages('lattice')
+install.packages('MASS')
+install.packages('car')
+install.packages('plyr')
+install.packages('gridExtra')
+```
+
+```{r}
+library(ggplot2)
+library(GGally)
+library(scales)
+library(memisc)
+data("diamonds")
+```
+
+
+# scatterplot
+
+```{}
+
+```
+
+# GGPairs 
+
+```{r}
+set.seed(20022012)
+
+
+# sample 1000 elements of the diamonds dataset
+# sample will by default sample the columns, so can;t just use the sample function on the dataset
+
+diamond_sample <- diamonds[sample.int(nrow(diamonds),1000),]
+
+
+# the lower and the upper parameters take a list, which also has a variable the variables can be
+# continuous, combo, discrete, na
+ggpairs(diamond_sample,
+        lower = list(continuous = wrap("points", shape= I('.'))),
+        upper = list(combo = wrap("box", outlier.shape = I('x')))
+        )
+
+```
+
+# Quiz 8
+
+
+# Create two histograms of the price variable
+# and place them side by side on one output image.
+
+# We've put some code below to get you started.
+
+# The first plot should be a histogram of price
+# and the second plot should transform
+# the price variable using log10.
+
+# Set appropriate bin widths for each plot.
+# ggtitle() will add a title to each histogram.
+
+# You can self-assess your work with the plots
+# in the solution video.
+
+# ALTER THE CODE BELOW THIS LINE
+# ==============================================
+```{r}
+library(gridExtra)
+
+plot1 <- qplot(x=price, data=diamonds, binwidth=100) + 
+  ggtitle('Price')
+
+plot2 <- qplot(x=price, data=diamonds, binwidth=0.01) +
+  scale_x_log10()+
+  ggtitle('Price (log10)')
+
+grid.arrange(plot1, plot2)
+
+```
+
+The 2 peaks show the demand in diamonds for cheaper and the more expensive
+- bimodal, 2 classes, rich and poor customers
+
+# scatterplot transformation
+```{r}
+
+
+qplot(x=carat, y=price, data=diamonds) +
+  #scale_y_log10() + 
+  scale_y_continuous(trans = log10_trans()) +
+  ggtitle('price (log10) by carat')
+```
+
+# scatterplot transformation using cuberoot
+
+```{r}
+cuberoot_trans = function() trans_new('cuberoot',
+          transform = function(x) x^(1/3),
+          inverse = function(x) x^3)
+
+# implicit return 
+noodle = function(x) 2*x 
+
+
+
+ggplot(aes(x=carat, y=price), data = diamonds) +
+  geom_point(alpha=0.01, position="jitter", size=0.75) +
+  scale_x_continuous(trans = 'cuberoot', limits=c(0.2,3), breaks=c(0.2,0.5,1,2,3)) +# i think you can even pass cuberoot_trans()
+  scale_y_continuous(trans = log10_trans()) +
+  ggtitle('log10 price vs cuberoot carat')
+```
+
+## overplotting - when multiple points take on the same value, which is why we sometimes introduce jitter
+
+```{r}
+# table tells you each unique variable and the counts of each variable
+table(diamonds$carat)
+
+# let's gett he variable counts and sort 
+# I've also seen decreasing = T
+sort(table(diamonds$carat), decreasing = TRUE)
+
+head(sort(table(diamonds$carat), decreasing = TRUE))
+
+```
+
+
+# Using color
+
+```{r}
+install.packages('RColorBrewer', dependencies = TRUE)
+library(RColorBrewer)
+
+```
+
+```{r}
+ggplot(aes(x=carat, y=price), data = diamonds) +
+  geom_point(alpha=0.01, position="jitter", size=0.75, aes(color=clarity)) +
+  scale_x_continuous(trans = 'cuberoot', limits=c(0.2,3), breaks=c(0.2,0.5,1,2,3)) +# i think you can even pass cuberoot_trans()
+  scale_y_continuous(trans = log10_trans()) +
+  ggtitle('log10 price vs cuberoot carat')
+
+```
+
+```{r}
+ggplot(aes(x = carat, y = price), data = diamonds) + 
+  geom_point(alpha = 0.5, size = 1, position = 'jitter', aes(color=clarity)) +
+  scale_color_brewer(type = 'div',
+    guide = guide_legend(title = 'Clarity', reverse = T,
+    override.aes = list(alpha = 1, size = 2))) +  
+  scale_x_continuous(trans = cuberoot_trans(), limits = c(0.2, 3),
+    breaks = c(0.2, 0.5, 1, 2, 3)) + 
+  scale_y_continuous(trans = log10_trans(), limits = c(350, 15000),
+    breaks = c(350, 1000, 5000, 10000, 15000)) +
+  ggtitle('Price (log10) by Cube-Root of Carat and Clarity')
+```
+
+
+# clarity does explain a lot of the variance
+
+
+
+# examining cut
+
+```{r}
+ggplot(aes(x = carat, y = price, color = cut), data = diamonds) + 
+  geom_point(alpha = 0.5, size = 1, position = 'jitter') +
+  scale_color_brewer(type = 'div',
+                     guide = guide_legend(title = 'cut', reverse = T,
+                                          override.aes = list(alpha = 1, size = 2))) +  
+  scale_x_continuous(trans = cuberoot_trans(), limits = c(0.2, 3),
+                     breaks = c(0.2, 0.5, 1, 2, 3)) + 
+  scale_y_continuous(trans = log10_trans(), limits = c(350, 15000),
+                     breaks = c(350, 1000, 5000, 10000, 15000)) +
+  ggtitle('Price (log10) by Cube-Root of Carat and cut')
+```
+
+# linear models
+
+
+# lm(y~x) where y is the outcome variable and x is the explanatory variable
+
+# in our study we'd apply the formula log(price)~carat^(1/3)
+
+# I() wrapper, I stands for as is, it tells I to transform the variable BEFORE doing the regression
+
+```{r}
+model_1 <- lm(I(log(price))~I(carat^(1/3)), data=diamonds)
+
+# you can add further variables to the model, to see what explains most of the variance
+
+model_2 <- update(model_1, ~ . + carat) # how much does untransformed carat explain the variance
+model_3 <- update(model_2, ~ . + cut) # how much does untransformed carat explain the variance
+model_4 <- update(model_3, ~ . + color) # how much does untransformed carat explain the variance
+model_5 <- update(model_4, ~ . + clarity) # how much does untransformed carat explain the variance
+
+mtable(model_1,model_2,model_3, model_4, model_5)
+
+```
+
+# predict the model
+
+
+# at 0.95 confidence interbal
+```{r}
+# when the model has been built, you can use it to predict, using the predict function
+unknown <- data.frame(carat=0.6, cut='V.good')
+model_estimate <- predict(model_2, newdata = unknown, interval = "prediction", level=.95)
+
+
+model_estimate
+```
+
+
+
+
+

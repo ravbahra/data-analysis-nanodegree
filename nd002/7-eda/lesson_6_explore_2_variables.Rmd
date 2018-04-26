@@ -1,0 +1,177 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(ggplot2)
+data(diamonds)
+
+ggplot(aes(x=price, y=x), data = diamonds) +
+  coord_trans(y = 'sqrt') +
+  geom_point() +
+  geom_smooth()
+
+```
+
+#correlation between price and x
+
+```{r}
+names(diamonds)
+```
+```{r}
+with(diamonds, cor.test(price, x))
+with(diamonds, cor.test(price, y))
+with(diamonds, cor.test(price, z))
+```
+
+
+## scatter plot of price vs depth
+
+```{r}
+max_price <- which.max(c(diamonds$price))
+
+ggplot(aes(x=price, y=depth), data=diamonds) +
+  geom_point(alpha=0.01) + 
+  scale_x_continuous(breaks = seq(from=0, to = max_price, by = 200))
+```
+
+```{r}
+max_depth <- which.max(c(diamonds$depth))
+ggplot(aes(x=depth, y=price), data=diamonds) +
+  geom_point(alpha=0.01) + 
+  scale_x_continuous(breaks = seq(from=0, to = max_depth, by = 2))
+```
+
+
+```{r}
+with(diamonds, cor.test(price, depth))
+```
+
+
+# Create a scatterplot of price vs carat
+# and omit the top 1% of price and carat
+# values.
+
+# This assignment is not graded and
+# will be marked as correct when you submit.
+
+```{r}
+quantile_level <- 0.99
+ggplot(aes(x=carat, y=price), data=diamonds) +
+  geom_point( color='orange') + 
+  xlim(0, quantile(diamonds$carat, quantile_level)) +
+  ylim(0,quantile(diamonds$price, quantile_level))
+
+```
+
+
+# price vs volume
+
+```{r}
+
+diamonds$volume = diamonds$x * diamonds$y * diamonds$z
+ggplot(aes(x=volume, y=price), data = diamonds) + 
+  geom_point() + 
+  coord_trans(x = 'sqrt', y='sqrt')
+
+```
+
+
+```{r}
+with(subset(diamonds, volume>0  & volume <800), cor.test(price, volume))
+```
+```{r}
+new_subset <- subset(diamonds, volume > 0 & volume< 800)
+ggplot(aes(x=price, y=volume), data=diamonds) + 
+  geom_point() +
+  geom_smooth()
+```
+
+
+```{r}
+library(dplyr)
+
+
+grouped_dbc <- group_by(diamonds, clarity)
+diamondsByClarity <- summarise(grouped_dbc, mean_price = mean(price), median_price=median(price), min_price=min(price), max_price=max(price), n=n())
+
+diamondsByClarity
+
+```
+
+
+```{r}
+library(gridExtra)
+diamonds_by_clarity <- group_by(diamonds, clarity)
+diamonds_mp_by_clarity <- summarise(diamonds_by_clarity, mean_price = mean(price))
+
+diamonds_by_color <- group_by(diamonds, color)
+diamonds_mp_by_color <- summarise(diamonds_by_color, mean_price = mean(price))
+
+
+chart_clarity <- ggplot(aes(x=clarity, y=mean_price), data=diamonds_mp_by_clarity) +
+  geom_bar(stat="identity")
+
+chart_color <- ggplot(aes(x=color, y=mean_price), data=diamonds_mp_by_color) + 
+  geom_bar(stat="identity")
+
+grid.arrange(chart_clarity, chart_color)
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+f
