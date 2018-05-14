@@ -14,9 +14,7 @@ Thumbs.db
 
 
 # exclusions for the data wrangling project
-./nd002/final-project-data-wrangling/ipynb_checkpoints/
-./nd002/final-project-data-wrangling/names.csv
-./nd002/final-project-data-wrangling/problem_names.csv
-./nd002/final-project-data-wrangling/twitter_api_keys.json
-./nd002/final-project-data-wrangling/tweet_json.txt
-
+/nd002/final-project-data-wrangling/ipynb_checkpoints/
+/nd002/final-project-data-wrangling/names.csv
+/nd002/final-project-data-wrangling/problem_names.csv
+/nd002/final-project-data-wrangling/twitter_api_keys.json
